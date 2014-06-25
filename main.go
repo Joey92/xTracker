@@ -1,21 +1,20 @@
 package main
 
 import (
+	"code.google.com/p/go.net/websocket"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 )
 
-var application *App
 var shutdownFlag bool
+var rides map[int64]*Ride
+var rideUpdates chan *Ride
+var livemapClients []*websocket.Conn
 
 func main() {
-
-	application = &App{
-		Rides:       map[int64]*Ride{},
-		RideUpdates: make(chan *Ride),
-	}
 
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt)
@@ -25,13 +24,24 @@ func main() {
 		shutdownFlag = true
 	}()
 
+	rides = map[int64]*Ride{}
+	rideUpdates = make(chan *Ride, 0)
+
+	http.Handle("/live", websocket.Handler(livemap))
+	http.HandleFunc("/location", locationHandler)
+
 	// run main application in goroutine
-	go application.run()
+	go http.ListenAndServe(":8080", nil)
+
+	go updateClients()
+
+	go rideCleanup()
 
 	for !shutdownFlag {
 		time.Sleep(1 * time.Second)
 	}
 
-	application.shutdown()
+	shutdown()
+
 	os.Exit(1)
 }
