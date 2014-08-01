@@ -16,7 +16,19 @@ func livemap(ws *websocket.Conn) {
 
 	defer ws.Close() // close connection when function ends
 
-	msg, _ := json.Marshal(rides)
+	var currentRides []*Ride
+
+	for _, ride := range rides {
+		currentRides = append(currentRides, ride)
+	}
+
+	msg, errMarshal := json.Marshal(currentRides)
+
+	currentRides = nil
+
+	if errMarshal != nil {
+		fmt.Println(errMarshal.Error())
+	}
 
 	// send all current rides
 	_, errwrite := ws.Write(msg)
